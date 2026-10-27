@@ -1,98 +1,1904 @@
-# 🥛 Dairy Backend (`Dairy-Backend`)
+# Dairy Marketplace Platform --- Backend & Frontend Implementation Contract
 
-Core enterprise backend service for the Dairy Marketplace and Subscription platform, powered by **NestJS**, **Prisma ORM**, **PostgreSQL**, **Redis**, and **Socket.io**.
+> **Purpose:** This README is the authoritative implementation reference
+> for developers and AI coding agents working on the Dairy Marketplace
+> Platform.
+>
+> **Important:** Do not change architecture, naming conventions, API
+> contracts, authentication rules, tenant isolation, or business logic
+> defined here without an explicit project-level decision.
 
-- **GitHub Repository:** [https://github.com/MaheshKumarBisai/Dairy-Backend.git](https://github.com/MaheshKumarBisai/Dairy-Backend.git)
-- **Port:** `4000`
+------------------------------------------------------------------------
 
----
+## 1. Project Overview
 
-## 🌐 Platform Architecture & Connected Repositories
+This project is a **multi-merchant dairy marketplace**.
 
-This repository contains the **Main Core Backend** of the platform. The other modules in the Dairy platform are maintained in their respective standalone repositories:
+Independent dairy merchants can sell their own products through the
+platform.
 
-| Service / App | Repository | Port | Description |
-| --- | --- | --- | --- |
-| **Main Backend** (This Repo) | [Dairy-Backend](https://github.com/MaheshKumarBisai/Dairy-Backend.git) | `4000` | NestJS Core API, Auth, Orders, Subscriptions, Payments, Geo |
-| **Admin Backend** | [Dairy-Adm-Backend](https://github.com/MaheshKumarBisai/Dairy-Adm-Backend.git) | `4001` | Express.js Admin API with live SSE event streaming |
-| **Admin Frontend** | [Dairy-Adm-frontend](https://github.com/MaheshKumarBisai/Dairy-Adm-frontend.git) | `3001` | React + Vite administrative dashboard |
-| **Customer App** | [Dairy-customer-frontend](https://github.com/MaheshKumarBisai/Dairy-customer-frontend.git) | `5173` | Expo customer mobile web app with live order tracking |
-| **Delivery App** | [Dairy-delivery-frontend](https://github.com/MaheshKumarBisai/Dairy-delivery-frontend.git) | `5174` | Expo delivery courier app with GPS turn navigation |
+Customers can:
 
-> **Note:** The `admin/` and `front-end-dairy/` folders are excluded from this repository via `.gitignore` to maintain clean separation across independent git repositories.
+-   Browse dairy products
+-   Add products to cart
+-   Buy products one time
+-   Create recurring dairy plans
+-   Select delivery days
+-   Skip tomorrow's delivery
+-   Pause/resume a plan
+-   Change quantities
+-   Request an extra delivery
+-   Pay online or use supported payment methods
+-   Track orders
 
----
+Delivery partners can:
 
-## 📋 Prerequisites
-- **Node.js:** `v20.x` or higher (`node -v`)
-- **npm:** `v10.x` or higher (`npm -v`)
-- **Docker Desktop:** Running (`docker --version` and `docker compose version`)
+-   View assigned deliveries
+-   Accept delivery assignments
+-   Pick up orders
+-   Navigate to customers
+-   Update delivery status
+-   Complete delivery
 
----
+Merchants can:
 
-## ⚡ Local Setup
+-   Manage their own products
+-   Manage inventory
+-   Receive and process orders
+-   Manage their own delivery partners
+-   Assign deliveries
+-   View their own customers and reports
 
-### 1. Clone & Navigate
-```bash
-git clone https://github.com/MaheshKumarBisai/Dairy-Backend.git
-cd Dairy-Backend
+The platform administrator can manage the overall platform.
+
+### Core principle
+
+**One merchant must never be able to access, modify, or view another
+merchant's business data.**
+
+------------------------------------------------------------------------
+
+# 2. Applications
+
+The system consists of:
+
+1.  **React Customer Application**
+2.  **React Delivery Partner Application**
+3.  **React Merchant Application**
+4.  **React Admin Application**
+
+These can initially be implemented as a shared React codebase with
+role-based experiences if that is practical.
+
+The backend is the single source of truth for:
+
+-   Authentication
+-   Authorization
+-   User roles
+-   Merchant ownership
+-   Orders
+-   Payments
+-   Inventory
+-   Delivery assignments
+-   Recurring plans
+
+The frontend must never be trusted for authorization.
+
+------------------------------------------------------------------------
+
+# 3. Technology Stack
+
+## Backend
+
+-   **Node.js**
+-   **TypeScript**
+-   **NestJS**
+-   **PostgreSQL**
+-   **Prisma ORM**
+-   **Redis**
+-   **JWT authentication**
+-   **Swagger / OpenAPI**
+-   **Jest**
+-   **Pino or equivalent structured logger**
+
+## Frontend
+
+-   **React**
+-   **TypeScript**
+-   React Router
+-   A consistent component/UI system
+-   API client generated or maintained from the OpenAPI contract
+
+## Infrastructure
+
+-   Docker
+-   Docker Compose for local development
+-   CI/CD
+-   Development environment
+-   Production environment separated from development
+
+## External Services
+
+Use replaceable service abstractions for:
+
+-   Payment provider
+-   Email/OTP provider
+-   Push notifications
+-   Maps/routing
+-   Object/file storage
+
+Do not tightly couple business logic directly to one external provider.
+
+------------------------------------------------------------------------
+
+# 4. Architecture
+
+Use a **modular monolith** for V1.
+
+Do **not** start with microservices.
+
+Recommended structure:
+
+``` text
+React Applications
+        |
+        v
+     REST API
+        |
+        v
+   NestJS Backend
+        |
+   +----+----+
+   |         |
+PostgreSQL Redis
 ```
 
-### 2. Start PostgreSQL & Redis Containers
-Start the required PostgreSQL and Redis services using Docker Compose:
-```bash
-docker compose up -d
-```
-> **Services started:**
-> - **PostgreSQL:** `localhost:5433` (DB: `dairy_db`, User: `dairy_user`, Password: `dairy_password`)
-> - **Redis:** `localhost:6379`
+The backend should be internally modular so individual modules can be
+extracted into services later if the scale requires it.
 
-### 3. Configure Environment Variables
-Create your local `.env` file from `.env.example`:
-```bash
-cp .env.example .env
-```
+------------------------------------------------------------------------
 
-### 4. Install Dependencies
-```bash
-npm install
-```
+# 5. Backend Modules
 
-### 5. Setup Database Schema & Seed Data
-Push the Prisma database schema and populate initial demo products, merchants, users, and addresses:
-```bash
-npx prisma db push
-npm run prisma:seed
-```
+The backend should contain clearly separated modules:
 
-### 6. Start Development Server
-```bash
-npm run start:dev
+``` text
+auth
+users
+merchants
+delivery-partners
+customers
+products
+categories
+inventory
+cart
+orders
+dairy-plans
+payments
+deliveries
+addresses
+coupons
+notifications
+reports
+admin
 ```
 
-The Main Backend is now active at **http://localhost:4000** (API base: `http://localhost:4000/api/v1`).
+Each module should contain its own:
 
----
+``` text
+controller
+service
+repository/data-access
+dto
+entities/models
+validation
+tests
+```
 
-## 🔑 Demo Seed Credentials
-All seed accounts use the default password: **`Password@123`**
+Do not create one giant service or controller.
 
-| Role | Email | Name / ID |
-| --- | --- | --- |
-| **Customer** | `customer@example.com` | Ananya Roy |
-| **Delivery Partner** | `driver.raj@farmfresh.com` | DEL-100001 (Rajesh Kumar) |
-| **Merchant** | `merchant@farmfresh.com` | MR-100001 (FarmFresh Dairy) |
-| **Merchant** | `merchant@greenvalley.com` | MR-100002 (GreenValley Organics) |
-| **Admin** | `admin@dairyplatform.com` | System Admin |
+------------------------------------------------------------------------
 
----
+# 6. User and Identity Model
 
-## 📡 Key Core API Endpoints
-- **Swagger / API Docs:** `GET http://localhost:4000/api/docs`
-- **Health:** `GET http://localhost:4000/api/v1/health`
-- **Authentication:** `POST http://localhost:4000/api/v1/auth/login`
-- **Products:** `GET http://localhost:4000/api/v1/products`
-- **Cart:** `GET / POST http://localhost:4000/api/v1/cart`
-- **Orders:** `GET / POST http://localhost:4000/api/v1/orders`
-- **Subscription Plans:** `GET / POST http://localhost:4000/api/v1/dairy-plans`
-- **Deliveries:** `GET / PATCH http://localhost:4000/api/v1/deliveries`
+All people who access the system are represented by a user identity.
+
+Every user receives a unique `userId`.
+
+### User ID format
+
+``` text
+USR-100001
+USR-100002
+USR-100003
+```
+
+Rules:
+
+-   Prefix must be `USR-`
+-   Numeric portion must be unique
+-   Numeric portion starts at `100001`
+-   IDs must never be reused
+-   IDs must be generated by the backend
+-   Frontend must never generate IDs
+-   IDs must be immutable after creation
+
+Email is the initial login identifier.
+
+Phone login is **not required for V1**.
+
+------------------------------------------------------------------------
+
+# 7. Merchant Identity
+
+Every merchant receives a unique merchant ID.
+
+### Merchant ID format
+
+``` text
+MR-100001
+MR-100002
+MR-100003
+```
+
+Rules:
+
+-   Prefix must be `MR-`
+-   Numeric portion must be unique
+-   IDs must be generated by the backend
+-   IDs must never be reused
+-   A merchant owns its own products, inventory, orders, delivery
+    partners, and merchant-level data
+
+A merchant must never access another merchant's data.
+
+------------------------------------------------------------------------
+
+# 8. Delivery Partner Identity
+
+Every delivery partner receives a unique delivery ID.
+
+### Delivery ID format
+
+``` text
+DEL-100001
+DEL-100002
+DEL-100003
+```
+
+Rules:
+
+-   Prefix must be `DEL-`
+-   Numeric portion starts at `100001`
+-   IDs must be unique
+-   IDs must be generated by the backend
+-   IDs must never be reused
+-   Every delivery partner belongs to a merchant
+-   A delivery partner can only access deliveries assigned to them or
+    permitted by their merchant
+
+------------------------------------------------------------------------
+
+# 9. Admin Identity
+
+Platform administrators receive a dedicated unique administrator ID.
+
+### Admin ID format
+
+``` text
+ADM-100001
+ADM-100002
+ADM-100003
+```
+
+Rules:
+
+-   Prefix must be `ADM-`
+-   Numeric portion starts at `100001`
+-   Numeric portion must be unique
+-   IDs must be generated by the backend
+-   IDs must never be reused
+-   IDs must be immutable after creation
+-   Frontend must never generate Admin IDs
+
+The role determines administrative privileges.
+
+------------------------------------------------------------------------
+
+# 9A. Order ID & Identifier Conventions
+
+Every order receives a unique order ID.
+
+### Order ID format
+
+```text
+ORD-100001
+ORD-100002
+ORD-100003
+```
+
+Rules:
+
+- Prefix must be `ORD-`
+- Numeric portion starts at `100001`
+- IDs must be generated by the backend
+- IDs must be unique
+- IDs must never be reused
+- IDs must be immutable after creation
+- Frontend applications must never generate order IDs
+
+The platform uses the following authoritative identifier conventions:
+
+```text
+USR-100001   (Customer / General User)
+ADM-100001   (Platform Administrator)
+MR-100001    (Merchant Store / Tenant)
+DEL-100001   (Delivery Partner)
+CAT-100001   (Product Category)
+PRD-100001   (Product Item)
+IMG-100001   (Processed Product Image)
+ORD-100001   (Order Instance)
+DP-100001    (Recurring Dairy Plan)
+```
+
+# 10. Roles
+
+Initial roles:
+
+``` text
+CUSTOMER
+MERCHANT
+DELIVERY_PARTNER
+ADMIN
+```
+
+The role must be stored and controlled by the backend.
+
+Example:
+
+``` json
+{
+  "userId": "USR-100001",
+  "role": "CUSTOMER"
+}
+```
+
+The frontend may display different screens based on the role, but
+**frontend role checks are not security controls**.
+
+Every protected API must enforce authorization on the backend.
+
+------------------------------------------------------------------------
+
+# 11. Authentication
+
+Initial authentication:
+
+``` text
+User ID + Password
+```
+
+The user ID can be associated with an email address.
+
+Passwords must:
+
+-   Never be stored as plaintext
+-   Never appear in API responses
+-   Never be logged
+-   Be hashed using a strong password hashing algorithm
+-   Have appropriate password validation
+
+Recommended flow:
+
+``` text
+Login
+  |
+  v
+Validate credentials
+  |
+  v
+Load user + role + merchant relationship
+  |
+  v
+Generate access token
+  |
+  v
+Return authenticated session
+```
+
+Use refresh tokens where appropriate.
+
+------------------------------------------------------------------------
+
+# 12. Authorization
+
+Authorization must be based on:
+
+``` text
+User
++
+Role
++
+Merchant ownership
++
+Resource ownership
+```
+
+Example:
+
+A merchant with:
+
+``` text
+merchantId = MR-100001
+```
+
+must not be able to request:
+
+``` text
+GET /products?merchantId=MR-100002
+```
+
+and receive merchant `MR-100002` data.
+
+The backend must determine the allowed merchant scope from the
+authenticated identity.
+
+**Never trust `merchantId` supplied by the frontend as proof of
+authorization.**
+
+------------------------------------------------------------------------
+
+# 13. Multi-Tenant Architecture
+
+This is a mandatory requirement.
+
+Each merchant is a tenant.
+
+Merchant-owned records must contain the appropriate `merchantId`.
+
+Examples:
+
+``` text
+products.merchantId
+inventory.merchantId
+orders.merchantId
+delivery_partners.merchantId
+coupons.merchantId
+```
+
+Where appropriate, related entities should inherit tenant scope through
+their parent entity.
+
+### Required rule
+
+Every merchant-scoped database query must include tenant isolation.
+
+Bad:
+
+``` text
+find product by productId
+```
+
+Good:
+
+``` text
+find product where
+productId = requestedId
+AND merchantId = authenticatedMerchantId
+```
+
+This rule must be enforced in backend code and tested.
+
+------------------------------------------------------------------------
+
+# 14. Product Model
+
+Products belong to merchants.
+
+Example:
+
+``` json
+{
+  "productId": "PRD-100001",
+  "merchantId": "MR-100001",
+  "name": "Cow Milk",
+  "description": "Fresh cow milk",
+  "price": 30,
+  "unit": "PACKET",
+  "quantity": 1,
+  "imageId": "IMG-100001",
+  "imageUrl": "https://cdn.example.com/products/PRD-100001.webp",
+  "subscriptionAllowed": true,
+  "isActive": true
+}
+```
+
+### Product Image Rules
+
+Every product image must have a stable backend-managed `imageId`.
+
+The database stores the image/object identifier, not the image binary itself. The API returns `imageUrl` for frontend display. When product images are private, `imageUrl` may be a temporary pre-signed URL generated by the backend.
+
+Example:
+
+```json
+{
+  "imageId": "IMG-100001",
+  "imageUrl": "https://storage.example.com/presigned-url..."
+}
+```
+
+Rules:
+
+- `imageId` is the stable image reference.
+- `imageUrl` is the delivery URL and may be temporary.
+- Never expose storage credentials, bucket secrets, or internal storage configuration.
+- The frontend must consume the returned `imageUrl`; it must not construct storage URLs itself.
+- Use a CDN/public image URL later if appropriate; keep `imageId` as the stable reference.
+- Product images must remain tenant-isolated by `merchantId`.
+
+### Product Image Processing
+
+When a merchant uploads a product image, process it before customer display.
+
+Recommended flow:
+
+```text
+Merchant uploads image
+        |
+        v
+Validate file type + size
+        |
+        v
+Store original privately
+        |
+        v
+Remove background
+        |
+        v
+Add clean white background
+        |
+        v
+Resize + optimize
+        |
+        v
+Convert to WebP/appropriate format
+        |
+        v
+Store processed image
+        |
+        v
+Create imageId
+        |
+        v
+Return imageId + imageUrl
+```
+
+The preferred customer-facing product image is the product isolated from its original background and placed on a clean white background. This is a backend/media-processing responsibility, not a frontend responsibility.
+
+For AI-based or heavy image processing, use an asynchronous job:
+
+```text
+Upload accepted
+      ↓
+Background-processing job
+      ↓
+Processed image
+      ↓
+Image status = READY
+```
+
+Keep the original upload privately when recovery/reprocessing is required. Do not expose it to customers by default.
+
+The processing service must verify that the image belongs to the authenticated merchant before attaching it to a product.
+
+Do not allow one merchant to attach another merchant's private image.
+Do not allow customers to upload or replace merchant product images.
+Do not allow arbitrary external image URLs unless explicitly supported and validated.
+Do not allow untrusted image files to bypass file-type, size, malware/security, and processing validation.
+
+Do not allow customers to modify product prices.
+
+Only authorized merchant/admin users can modify prices.
+
+------------------------------------------------------------------------
+
+# 14A. Customer Product Browse API
+
+The customer-facing product browse API must return a clean, stable, frontend-ready response.
+
+### Endpoint
+
+```http
+GET /api/v1/products
+```
+
+### Example Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "products": [
+      {
+        "productId": "PRD-100001",
+        "merchantId": "MR-100001",
+        "name": "Fresh Cow Milk",
+        "description": "Fresh farm cow milk, delivered daily.",
+        "category": {
+          "categoryId": "CAT-100001",
+          "name": "Milk"
+        },
+        "image": {
+          "imageId": "IMG-100001",
+          "imageUrl": "https://cdn.example.com/products/IMG-100001.webp"
+        },
+        "pricing": {
+          "price": 30,
+          "currency": "INR",
+          "unit": "500ml"
+        },
+        "availability": {
+          "isAvailable": true,
+          "stockStatus": "IN_STOCK"
+        },
+        "delivery": {
+          "subscriptionAllowed": true,
+          "availableSchedules": [
+            "DAILY",
+            "WEEKLY",
+            "SELECTED_DAYS"
+          ]
+        }
+      },
+      {
+        "productId": "PRD-100002",
+        "merchantId": "MR-100001",
+        "name": "Fresh Curd",
+        "description": "Thick and fresh dairy curd.",
+        "category": {
+          "categoryId": "CAT-100002",
+          "name": "Curd"
+        },
+        "image": {
+          "imageId": "IMG-100002",
+          "imageUrl": "https://cdn.example.com/products/IMG-100002.webp"
+        },
+        "pricing": {
+          "price": 45,
+          "currency": "INR",
+          "unit": "500g"
+        },
+        "availability": {
+          "isAvailable": true,
+          "stockStatus": "IN_STOCK"
+        },
+        "delivery": {
+          "subscriptionAllowed": true,
+          "availableSchedules": [
+            "DAILY",
+            "SELECTED_DAYS"
+          ]
+        }
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 2,
+      "totalPages": 1
+    }
+  },
+  "message": "Products retrieved successfully"
+}
+```
+
+### Customer Response Rules
+
+The customer product response should contain only information required by the customer application.
+
+Required product information:
+
+```text
+productId
+merchantId
+name
+description
+category
+image
+pricing
+availability
+delivery/subscription options
+```
+
+The frontend must use `image.imageUrl` directly and must not construct storage URLs.
+
+`merchantId` is retained in the API response for backend/domain identification, but it does not need to be displayed to the customer.
+
+The API must support pagination and should be designed to support future filtering such as:
+
+```text
+category
+merchant
+availability
+search
+price range
+subscription availability
+```
+
+Do not expose:
+
+- Merchant private information
+- Internal database fields
+- Storage credentials
+- Internal object-storage paths
+- Supplier/private business information
+- Internal cost price
+- Merchant-only inventory details
+
+# 15. Cart
+
+A cart belongs to a customer.
+
+Cart items must reference products.
+
+The backend must always recalculate:
+
+``` text
+subtotal
+discount
+delivery fee
+tax if applicable
+final total
+```
+
+Do not trust totals sent by the frontend.
+
+Example:
+
+``` text
+Frontend says:
+total = ₹100
+
+Backend:
+recalculate actual total
+```
+
+The backend calculation is authoritative.
+
+------------------------------------------------------------------------
+
+# 16. Order Types
+
+There are two primary concepts:
+
+### One-Time Order
+
+Products purchased once.
+
+Example:
+
+``` text
+Ghee × 1
+Paneer × 1
+```
+
+### Recurring Dairy Plan
+
+Products delivered according to a schedule.
+
+Example:
+
+``` text
+Cow Milk × 2 → Daily
+Curd × 2 → Monday / Wednesday / Friday
+```
+
+Do not treat a recurring plan as one giant order containing every future
+order.
+
+The recurring plan is the schedule.
+
+Individual orders are generated according to that schedule.
+
+------------------------------------------------------------------------
+
+# 17. Dairy Plans
+
+A dairy plan can contain multiple products.
+
+Example:
+
+``` text
+Dairy Plan #DP-100001
+
+Cow Milk
+Quantity: 2
+Schedule: Daily
+
+Curd
+Quantity: 2
+Schedule: Monday, Wednesday, Friday
+
+Ghee
+One-time
+```
+
+Supported scheduling:
+
+-   Daily
+-   Selected weekdays
+-   Weekly
+-   Monthly
+-   One-time
+
+------------------------------------------------------------------------
+
+# 18. Dairy Plan Actions
+
+Customers must be able to:
+
+``` text
+Skip tomorrow
+Pause plan
+Resume plan
+Change quantity
+Change delivery days
+Change delivery time
+Add extra delivery
+Cancel plan
+```
+
+### Skip Tomorrow
+
+If:
+
+``` text
+Milk → Daily
+```
+
+and customer selects:
+
+``` text
+Skip tomorrow
+```
+
+only tomorrow's generated order is skipped.
+
+The recurring plan remains active.
+
+### Extra Delivery
+
+If normal quantity is:
+
+``` text
+Milk × 2
+```
+
+customer can request:
+
+``` text
+Extra tomorrow × 2
+```
+
+Tomorrow's delivery becomes:
+
+``` text
+Milk × 4
+```
+
+The normal plan remains:
+
+``` text
+Milk × 2
+```
+
+after tomorrow.
+
+------------------------------------------------------------------------
+
+# 19. Order Status
+
+Use explicit order states.
+
+Recommended:
+
+``` text
+PENDING
+CONFIRMED
+PREPARING
+READY
+ASSIGNED
+OUT_FOR_DELIVERY
+DELIVERED
+CANCELLED
+FAILED
+```
+
+Do not allow arbitrary status strings.
+
+Status transitions must be validated by backend business rules.
+
+------------------------------------------------------------------------
+
+# 20. Delivery Status & Lifecycle
+
+Recommended delivery states:
+
+``` text
+AVAILABLE
+ASSIGNED
+ACCEPTED
+PICKED_UP
+OUT_FOR_DELIVERY
+DELIVERED
+FAILED
+```
+
+A delivery partner must not be able to mark an unrelated order as delivered.
+
+------------------------------------------------------------------------
+
+# 20A. Geolocation Delivery Dispatch & Broadcast Contract
+
+The platform implements proximity-based delivery order discovery and assignment for delivery partners.
+
+### Geolocation Dispatch Rules
+
+1. **Customer Coordinates**: Customer addresses store authoritative `latitude` and `longitude` coordinates for turn-by-turn navigation on maps.
+2. **Proximity Calculation**: The backend calculates the exact distance (in meters) between driver coordinates and the delivery address using the Haversine formula.
+3. **Radius Escalation**:
+   - **Phase 1 (Immediate)**: Available orders are broadcasted to drivers in close proximity (e.g. 500m – 5km).
+   - **Phase 2 (Escalation)**: If unaccepted after 30–60 seconds, search radius expands to broader zone (e.g. 8km – 10km).
+   - **Phase 3 (Fallback)**: Merchants retain manual override authority to assign specific store drivers directly.
+4. **Order Claiming**: Drivers can accept an available order via `POST /api/v1/deliveries/partner/accept/:orderId`, which atomically locks the assignment.
+
+### Available Deliveries API Contract
+
+**Endpoint:**
+```http
+GET /api/v1/deliveries/partner/available
+```
+
+**Query Parameters:**
+- `latitude` (optional): Current driver latitude
+- `longitude` (optional): Current driver longitude
+- `radiusInMeters` (optional): Proximity filter radius in meters (default: 10000)
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Limit per page (default: 20)
+
+**Response Format:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "orders": [
+      {
+        "orderId": "ORD-100021",
+        "merchantId": "MR-100001",
+        "status": "READY",
+        "delivery": {
+          "deliveryId": "DELIVERY-100001",
+          "status": "AVAILABLE"
+        },
+        "customer": {
+          "customerId": "USR-100125",
+          "name": "Mahesh",
+          "phone": "+91XXXXXXXXXX"
+        },
+        "deliveryAddress": {
+          "addressId": "ADDR-100021",
+          "addressLine1": "Example Street",
+          "city": "Vijayawada",
+          "state": "Andhra Pradesh",
+          "postalCode": "520001",
+          "latitude": 16.5062,
+          "longitude": 80.6480
+        },
+        "items": [
+          {
+            "productId": "PRD-100001",
+            "name": "Cow Milk",
+            "quantity": 2,
+            "unit": "500ml"
+          },
+          {
+            "productId": "PRD-100002",
+            "name": "Curd",
+            "quantity": 1,
+            "unit": "500g"
+          }
+        ],
+        "deliverySlot": {
+          "date": "2026-09-25",
+          "startTime": "06:00",
+          "endTime": "08:00"
+        }
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "totalItems": 1,
+      "totalPages": 1
+    }
+  },
+  "message": "Available delivery orders retrieved successfully"
+}
+```
+
+------------------------------------------------------------------------
+
+# 21. Payment
+
+Payment must be server-controlled.
+
+Flow:
+
+``` text
+Customer
+   |
+Checkout
+   |
+Backend calculates amount
+   |
+Create payment order
+   |
+Payment provider
+   |
+Payment result/webhook
+   |
+Backend verifies
+   |
+Order confirmed
+```
+
+Never trust:
+
+``` text
+amount
+payment status
+order status
+merchantId
+customerId
+```
+
+from the frontend.
+
+Payment webhooks must be:
+
+-   Authenticated/verified
+-   Idempotent
+-   Safe to receive multiple times
+
+A duplicate webhook must not create duplicate orders or duplicate
+payment records.
+
+------------------------------------------------------------------------
+
+# 22. API Standards
+
+All APIs must follow consistent naming.
+
+Use REST conventions.
+
+Example:
+
+``` text
+POST   /api/v1/auth/login
+GET    /api/v1/products
+GET    /api/v1/products/:productId
+POST   /api/v1/products
+PATCH  /api/v1/products/:productId
+DELETE /api/v1/products/:productId
+```
+
+Orders:
+
+``` text
+POST   /api/v1/orders
+GET    /api/v1/orders
+GET    /api/v1/orders/:orderId
+POST   /api/v1/orders/:orderId/cancel
+```
+
+Dairy plans:
+
+``` text
+POST /api/v1/dairy-plans
+GET  /api/v1/dairy-plans
+GET  /api/v1/dairy-plans/:planId
+POST /api/v1/dairy-plans/:planId/skip
+POST /api/v1/dairy-plans/:planId/pause
+POST /api/v1/dairy-plans/:planId/resume
+POST /api/v1/dairy-plans/:planId/extra-delivery
+PATCH /api/v1/dairy-plans/:planId
+```
+
+------------------------------------------------------------------------
+
+# 23. API Attribute Rules
+
+API attribute names must be consistent.
+
+Use **camelCase** in JSON.
+
+Correct:
+
+``` json
+{
+  "userId": "USR-100001",
+  "merchantId": "MR-100001",
+  "deliveryPartnerId": "DEL-100001",
+  "productId": "PRD-100001",
+  "imageId": "IMG-100001",
+  "orderId": "ORD-100001"
+}
+```
+
+Product responses must use consistent image attributes:
+
+```json
+{
+  "productId": "PRD-100001",
+  "merchantId": "MR-100001",
+  "name": "Cow Milk",
+  "description": "Fresh cow milk",
+  "imageId": "IMG-100001",
+  "imageUrl": "https://cdn.example.com/products/PRD-100001.webp",
+  "price": 30,
+  "unit": "PACKET",
+  "subscriptionAllowed": true,
+  "isActive": true
+}
+```
+
+Do not expose storage-provider credentials, bucket secrets, or internal object-storage configuration.
+
+Do not randomly mix:
+
+``` text
+user_id
+userid
+UserId
+USER_ID
+```
+
+inside API responses.
+
+Database naming may use `snake_case` if desired, but API contracts must
+remain consistent.
+
+------------------------------------------------------------------------
+
+# 24. API Response Format
+
+Use a consistent response structure.
+
+Success:
+
+``` json
+{
+  "success": true,
+  "data": {},
+  "message": "Request completed successfully"
+}
+```
+
+Error:
+
+``` json
+{
+  "success": false,
+  "error": {
+    "code": "PRODUCT_NOT_FOUND",
+    "message": "Product not found"
+  }
+}
+```
+
+Do not expose:
+
+-   Stack traces
+-   Database errors
+-   SQL queries
+-   Internal file paths
+-   Secrets
+-   Password hashes
+
+------------------------------------------------------------------------
+
+# 25. HTTP Status Codes
+
+Use correct HTTP status codes.
+
+``` text
+200 OK
+201 Created
+400 Bad Request
+401 Unauthorized
+403 Forbidden
+404 Not Found
+409 Conflict
+422 Unprocessable Entity
+429 Too Many Requests
+500 Internal Server Error
+```
+
+Do not return `200` for every error.
+
+------------------------------------------------------------------------
+
+# 26. Redis
+
+Redis can be used for:
+
+-   Caching
+-   Session/temporary data where appropriate
+-   Rate limiting
+-   Background job queues
+-   Scheduled dairy-order generation
+-   Notification jobs
+
+Do not use Redis as the primary source of business data.
+
+**PostgreSQL is the source of truth.**
+
+------------------------------------------------------------------------
+
+# 27. Background Jobs
+
+Recurring orders should be generated through reliable background jobs.
+
+Example:
+
+``` text
+Scheduled job
+      |
+      v
+Find active dairy plans
+      |
+      v
+Check tomorrow's schedule
+      |
+      v
+Generate eligible orders
+      |
+      v
+Reserve/check inventory
+      |
+      v
+Notify merchant/customer
+```
+
+Jobs must be **idempotent**.
+
+Running the same job twice must not create duplicate orders.
+
+------------------------------------------------------------------------
+
+# 28. Inventory
+
+Inventory must be controlled by the backend.
+
+Before confirming an order:
+
+``` text
+Check product availability
+        |
+        v
+Reserve/reduce stock according to business rules
+```
+
+Prevent overselling caused by simultaneous requests.
+
+Use database transactions where required.
+
+------------------------------------------------------------------------
+
+# 29. Database Transactions
+
+Use PostgreSQL transactions for operations where multiple records must
+change atomically.
+
+Examples:
+
+``` text
+Create order
++
+Create order items
++
+Create payment reference
+```
+
+or:
+
+``` text
+Change dairy plan
++
+Create required schedule change
+```
+
+If one required operation fails, the transaction must roll back.
+
+------------------------------------------------------------------------
+
+# 30. Validation
+
+Validate every external input.
+
+Validate:
+
+-   Email
+-   Password
+-   IDs
+-   Quantity
+-   Price-related inputs
+-   Dates
+-   Schedule
+-   Product IDs
+-   Address
+-   Coupon
+-   Payment information
+
+Never assume frontend validation is sufficient.
+
+------------------------------------------------------------------------
+
+# 31. Security Rules
+
+Mandatory:
+
+-   Hash passwords
+-   JWT validation
+-   Role-based authorization
+-   Tenant isolation
+-   Input validation
+-   Rate limiting
+-   Secure HTTP headers
+-   CORS configuration
+-   Secret management
+-   No secrets in Git
+-   No passwords in logs
+-   No payment secrets in frontend
+-   No database credentials in frontend
+-   SQL injection protection through Prisma/parameterized queries
+-   Proper audit logging for sensitive actions
+
+------------------------------------------------------------------------
+
+# 32. Environment Variables
+
+Never hardcode secrets.
+
+Use:
+
+``` text
+DATABASE_URL
+JWT_SECRET
+JWT_REFRESH_SECRET
+REDIS_URL
+PAYMENT_API_KEY
+PAYMENT_API_SECRET
+SMTP credentials
+STORAGE credentials
+```
+
+Commit only:
+
+``` text
+.env.example
+```
+
+Never commit:
+
+``` text
+.env
+```
+
+------------------------------------------------------------------------
+
+# 33. Testing Requirements
+
+The backend is not considered complete when the APIs merely work
+manually.
+
+Required testing:
+
+### Unit tests
+
+Test:
+
+-   Price calculation
+-   Discount calculation
+-   Dairy schedule calculation
+-   Skip logic
+-   Pause/resume logic
+-   Extra delivery logic
+-   Authorization logic
+
+### Integration tests
+
+Test:
+
+``` text
+API → Service → Database
+```
+
+### Security tests
+
+Test:
+
+``` text
+Customer → another customer's data
+Merchant A → Merchant B data
+Delivery Partner → unrelated delivery
+Customer → merchant API
+Merchant → admin API
+```
+
+All unauthorized access must fail.
+
+### Payment tests
+
+Test:
+
+-   Successful payment
+-   Failed payment
+-   Duplicate webhook
+-   Invalid webhook
+-   Incorrect amount
+-   Cancelled payment
+
+------------------------------------------------------------------------
+
+# 34. Swagger
+
+Swagger/OpenAPI must be maintained with the backend.
+
+Every API must document:
+
+-   Endpoint
+-   HTTP method
+-   Authentication requirement
+-   Request body
+-   Query parameters
+-   Path parameters
+-   Response
+-   Error responses
+-   Authorization requirements
+
+Swagger should be available in development.
+
+Example:
+
+``` text
+/api/docs
+```
+
+------------------------------------------------------------------------
+
+# 35. Logging
+
+Use structured logs.
+
+Logs should contain useful information such as:
+
+``` text
+requestId
+userId
+merchantId
+endpoint
+HTTP method
+status code
+execution time
+```
+
+Never log:
+
+``` text
+password
+JWT token
+payment secret
+full card details
+sensitive credentials
+```
+
+------------------------------------------------------------------------
+
+# 36. Audit Logging
+
+Record sensitive actions such as:
+
+``` text
+Product price changed
+Inventory changed
+Order cancelled
+Payment status changed
+Merchant created
+Delivery partner created
+User role changed
+Admin action performed
+```
+
+Audit records should identify:
+
+``` text
+actor
+action
+resource
+timestamp
+```
+
+------------------------------------------------------------------------
+
+# 37. Frontend Rules
+
+React applications must consume backend APIs.
+
+Frontend must not contain business authority.
+
+The frontend may:
+
+-   Display data
+-   Collect input
+-   Validate basic user input
+-   Show role-specific UI
+
+The frontend must not decide:
+
+-   Final price
+-   Payment success
+-   User permissions
+-   Merchant ownership
+-   Order authorization
+-   Inventory truth
+
+------------------------------------------------------------------------
+
+# 38. Do NOT Do These Things
+
+### Do not:
+
+-   Start with microservices
+-   Store passwords in plaintext
+-   Trust frontend prices
+-   Trust frontend roles
+-   Trust frontend merchant IDs
+-   Expose database directly to frontend
+-   Put secrets in React
+-   Put secrets in Git
+-   Allow cross-merchant queries
+-   Use Redis as the main database
+-   Generate IDs in frontend
+-   Reuse deleted IDs
+-   Create duplicate recurring orders
+-   Allow arbitrary order statuses
+-   Hardcode merchant IDs
+-   Hardcode customer IDs
+-   Hardcode delivery partner IDs
+-   Return internal database errors to users
+-   Skip automated tests for business logic
+-   Build payment logic only on the frontend
+
+------------------------------------------------------------------------
+
+# 39. Do Not Over-Engineer V1
+
+Do not initially add unnecessary systems such as:
+
+-   Kubernetes
+-   Kafka
+-   Multiple microservices
+-   Complex event-driven architecture
+-   Multiple databases
+-   Elasticsearch
+-   Complex recommendation engines
+
+Start with:
+
+``` text
+NestJS
++
+PostgreSQL
++
+Redis
++
+React
++
+Docker
+```
+
+Keep the architecture clean so these can be introduced later if
+required.
+
+------------------------------------------------------------------------
+
+# 40. Development Workflow
+
+Every feature should follow:
+
+``` text
+Requirement
+    ↓
+Database changes
+    ↓
+DTO
+    ↓
+Service/business logic
+    ↓
+Controller/API
+    ↓
+Unit tests
+    ↓
+Integration tests
+    ↓
+Swagger update
+    ↓
+Security/authorization test
+    ↓
+Code review
+    ↓
+Development deployment
+```
+
+Do not implement only the UI and assume the backend will be fixed later.
+
+------------------------------------------------------------------------
+
+# 41. Git Rules
+
+Use feature branches.
+
+Example:
+
+``` text
+main
+develop
+feature/authentication
+feature/products
+feature/orders
+feature/dairy-plans
+feature/payments
+```
+
+Do not commit directly to `main` for normal feature development.
+
+Commit messages should be meaningful.
+
+Example:
+
+``` text
+feat: add dairy plan creation
+fix: prevent duplicate recurring orders
+test: add merchant tenant isolation tests
+```
+
+------------------------------------------------------------------------
+
+# 42. Definition of Done
+
+A backend feature is complete only when:
+
+-   Database changes are complete
+-   API is implemented
+-   Validation is implemented
+-   Authorization is implemented
+-   Tenant isolation is verified
+-   Error handling is implemented
+-   Unit tests exist
+-   Integration tests exist where appropriate
+-   Swagger is updated
+-   Logs are appropriate
+-   No secrets are committed
+-   API behavior is verified
+-   Existing tests still pass
+
+------------------------------------------------------------------------
+
+# 43. AI Coding Agent Rules
+
+Any AI coding agent working on this repository must:
+
+1.  Read this README before modifying code.
+2.  Follow existing architecture.
+3.  Do not replace technologies without explicit approval.
+4.  Do not rename API attributes casually.
+5.  Do not change ID formats.
+6.  Do not remove tenant isolation.
+7.  Do not bypass authorization.
+8.  Do not expose secrets.
+9.  Do not modify database structure without checking relationships.
+10. Add migrations for database changes.
+11. Add tests for new business logic.
+12. Update Swagger when APIs change.
+13. Preserve backward compatibility where possible.
+14. Do not create duplicate functionality.
+15. Inspect existing code before creating a new module/service.
+16. Do not invent undocumented business rules.
+17. If a requirement is ambiguous, preserve the existing contract rather
+    than guessing.
+18. Never weaken security to make an API test pass.
+19. Never use frontend-provided identity or merchant ownership as an
+    authorization source.
+20. Verify cross-tenant access restrictions whenever merchant-scoped
+    functionality changes.
+
+------------------------------------------------------------------------
+
+# 44. Initial Implementation Order
+
+Implement in this order:
+
+``` text
+1. Project setup
+2. PostgreSQL + Prisma
+3. User model
+4. Authentication
+5. RBAC
+6. Merchant model
+7. Multi-tenant authorization
+8. Customer model
+9. Delivery partner model
+10. Categories
+11. Products
+12. Inventory
+13. Cart
+14. Price calculation
+15. One-time orders
+16. Dairy plans
+17. Skip/Pause/Resume
+18. Quantity changes
+19. Extra delivery
+20. Payment integration
+21. Merchant order management
+22. Delivery assignment
+23. Delivery workflow
+24. Notifications
+25. Redis/background jobs
+26. Reports
+27. Security testing
+28. Full integration testing
+29. Development deployment
+```
+
+------------------------------------------------------------------------
+
+# 45. Core Business Flow
+
+``` text
+                    CUSTOMER
+                       |
+                       v
+                  Browse Products
+                       |
+                       v
+                     Cart
+                       |
+                       v
+              Select Delivery Type
+                 /           \
+                /             \
+         One-Time          Recurring
+             |                 |
+             |             Dairy Plan
+             |                 |
+             |        Daily / Selected Days
+             |                 |
+             +--------+--------+
+                      |
+                      v
+                   Checkout
+                      |
+                      v
+              Backend Price Check
+                      |
+                      v
+                   Payment
+                      |
+                      v
+               Payment Verified
+                      |
+                      v
+                Order Confirmed
+                      |
+                      v
+                   Merchant
+                      |
+                      v
+               Prepare Order
+                      |
+                      v
+             Assign Delivery Partner
+                      |
+                      v
+                Out for Delivery
+                      |
+                      v
+                  Delivered
+```
+
+Recurring:
+
+``` text
+Dairy Plan
+    |
+    v
+Scheduler
+    |
+    v
+Check today's schedule
+    |
+    +---- Skip? ------> Do not create order
+    |
+    +---- Active? ----> Create order
+                         |
+                         v
+                    Merchant
+                         |
+                         v
+                      Delivery
+```
+
+------------------------------------------------------------------------
+
+# 46. Final Architecture Decision
+
+The current approved direction is:
+
+``` text
+Frontend
+└── React + TypeScript
+
+Backend
+└── Node.js + TypeScript + NestJS
+
+Database
+└── PostgreSQL
+
+ORM
+└── Prisma
+
+Cache / Jobs
+└── Redis
+
+Authentication
+└── JWT + Password
+
+API
+└── REST + OpenAPI/Swagger
+
+Testing
+└── Jest
+
+Local Environment
+└── Docker Compose
+
+Architecture
+└── Modular Monolith
+
+Business Model
+└── Multi-merchant / Multi-tenant
+
+Identity
+├── USR-100001 (Customer / User)
+├── ADM-100001 (Admin)
+├── MR-100001  (Merchant)
+├── DEL-100001 (Delivery Partner)
+├── PRD-100001 (Product)
+├── IMG-100001 (Image)
+├── ORD-100001 (Order)
+└── DP-100001  (Dairy Plan)
+```
+
+## Non-negotiable principle
+
+> **PostgreSQL is the source of truth. Backend authorization is the
+> source of truth for access. Merchant data must always remain isolated.
+> Frontend is never trusted for security or business-critical
+> calculations.**
+
+This README should be treated as the **baseline implementation
+contract** by developers and AI coding agents. Any architectural change
+should be explicitly documented before implementation.

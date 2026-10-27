@@ -1,4 +1,4 @@
-# Compiled output
+# Compiled output & dependencies
 /dist
 /node_modules
 
@@ -8,29 +8,45 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 lerna-debug.log*
 
 # OS Files
 .DS_Store
 Thumbs.db
+*.desktop
 
-# Environment variables
+# Environment variables & secrets
 .env
 .env.production
 .env.local
+.env.*.local
+*.pem
+*.key
 
-# IDE
-.idea
-.vscode
+# IDE & Editor files
+.idea/
+.vscode/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
-# Coverage
+# Coverage & Tests
 /coverage
+.nyc_output
 
 # Prisma
 /prisma/migrations/migration_lock.toml
 
-# Separate Repositories (Managed in their own git repos)
+# Media & Temporary files
+*.mp4
+*.mov
+*.avi
+.cache/
+.temp/
+tmp/
+
+# Separate Repositories (Managed in their own independent git repos)
 /admin/
 /front-end-dairy/
