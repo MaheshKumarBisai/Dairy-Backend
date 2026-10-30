@@ -46,6 +46,7 @@ jobs:
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          AWS_S3_BUCKET_NAME: ${{ secrets.AWS_S3_BUCKET_NAME }}
           PORT: 4000
         run: |
           # Sanitize instance ID: strip whitespace, quotes, and newlines
@@ -75,12 +76,14 @@ jobs:
             -e REDIS_HOST="$REDIS_HOST" \
             -e REDIS_PORT="$REDIS_PORT" \
             -e JWT_SECRET="$JWT_SECRET" \
+            -e AWS_S3_BUCKET_NAME="$AWS_S3_BUCKET_NAME" \
+            -e AWS_REGION="$AWS_REGION" \
             "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker image prune -af --filter "until=24h"
           EOF
 
           # Substitute variables safely
-          envsubst '$AWS_REGION $ECR_REGISTRY $ECR_REPOSITORY $IMAGE_TAG $PORT $DATABASE_URL $REDIS_HOST $REDIS_PORT $JWT_SECRET' < run_deploy.sh > script_substituted.sh
+          envsubst '$AWS_REGION $ECR_REGISTRY $ECR_REPOSITORY $IMAGE_TAG $PORT $DATABASE_URL $REDIS_HOST $REDIS_PORT $JWT_SECRET $AWS_S3_BUCKET_NAME' < run_deploy.sh > script_substituted.sh
           B64_SCRIPT=$(base64 -w 0 < script_substituted.sh)
 
           COMMAND_ID=$(aws ssm send-command \

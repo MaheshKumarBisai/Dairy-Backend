@@ -6,6 +6,7 @@ import sharp from 'sharp';
 import { removeBackground } from '@imgly/background-removal-node';
 import { PrismaService } from '../../../database/prisma.service';
 import { IdGeneratorService, IdPrefix } from '../../../common/services/id-generator.service';
+import { S3StorageService } from '../../../common/services/s3-storage.service';
 
 @Injectable()
 export class ProductImageService {
@@ -15,6 +16,7 @@ export class ProductImageService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly idGenerator: IdGeneratorService,
+    private readonly s3StorageService: S3StorageService,
   ) {}
 
   /**
@@ -76,31 +78,46 @@ export class ProductImageService {
           })
           .toBuffer();
 
+        let processedBuffer: Buffer;
+        try {
+          processedBuffer = await sharp({
+            create: {
+              width: canvasSize,
+              height: canvasSize,
+              channels: 4,
+              background: { r: 255, g: 255, b: 255, alpha: 1 },
+            },
+          })
+            .composite([{ input: fittedProduct, gravity: 'center' }])
+            .png()
+            .toBuffer();
+        } catch {
+          processedBuffer = await sharp(fileBuffer)
+            .flatten({ background: { r: 255, g: 255, b: 255 } })
+            .resize(600, 600, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
+            .png()
+            .toBuffer();
+        }
+
         const processedPath = path.join(uploadsDir, `${imageId}.png`);
+        fs.writeFileSync(processedPath, processedBuffer);
 
-        await sharp({
-          create: {
-            width: canvasSize,
-            height: canvasSize,
-            channels: 4,
-            background: { r: 255, g: 255, b: 255, alpha: 1 },
-          },
-        })
-          .composite([{ input: fittedProduct, gravity: 'center' }])
-          .png()
-          .toFile(processedPath);
+        // Upload to S3 if bucket is configured
+        const bucketName = this.configService.get<string>('AWS_S3_BUCKET_NAME');
+        if (bucketName) {
+          try {
+            const s3OrigKey = `uploads/products/${merchantId}/${imageId}_orig_${originalFilename}`;
+            const s3ProcKey = `uploads/products/${merchantId}/${imageId}.png`;
 
-        this.logger.log(`[ImageProcessing] Successfully generated white-background product image: ${processedPath}`);
-        processedUrl = `/uploads/${merchantId}/${imageId}.png`;
+            originalUrl = await this.s3StorageService.uploadFile(s3OrigKey, fileBuffer, 'image/jpeg');
+            processedUrl = await this.s3StorageService.uploadFile(s3ProcKey, processedBuffer, 'image/png');
+            this.logger.log(`[ImageProcessing] Synced product image to S3: ${processedUrl}`);
+          } catch (s3Err: any) {
+            this.logger.warn(`[ImageProcessing] S3 upload skipped/failed: ${s3Err.message}`);
+          }
+        }
       } catch (procErr: any) {
-        this.logger.error(`[ImageProcessing] Background removal fallback to direct white-background flatten: ${procErr.message}`);
-        const fallbackPath = path.join(uploadsDir, `${imageId}.png`);
-        await sharp(fileBuffer)
-          .flatten({ background: { r: 255, g: 255, b: 255 } })
-          .resize(600, 600, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
-          .png()
-          .toFile(fallbackPath);
-        processedUrl = `/uploads/${merchantId}/${imageId}.png`;
+        this.logger.error(`[ImageProcessing] Processing error: ${procErr.message}`);
       }
     } else {
       processedUrl = `/uploads/${merchantId}/${imageId}.png`;
