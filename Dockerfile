@@ -1,5 +1,5 @@
 # Stage 1: Build & Generate Prisma Client
-FROM node:20-bullseye-slim AS builder
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ RUN npm run build
 RUN npm prune --production
 
 # Stage 2: Production Runner
-FROM node:20-bullseye-slim AS runner
+FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
@@ -35,6 +35,9 @@ ENV PORT=4000
 # Security: run as non-root user
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 -g nodejs nestjs
+
+# Pre-create uploads directory with proper ownership
+RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
 
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
