@@ -35,7 +35,7 @@ export class ProductImageService {
     const imageId = await this.idGenerator.generateId(IdPrefix.IMAGE);
     const storageBase = this.configService.get<string>(
       'storage.baseUrl',
-      'http://192.168.1.3:4000/uploads',
+      '/uploads',
     );
 
     const uploadsDir = path.join(process.cwd(), 'uploads', merchantId);
