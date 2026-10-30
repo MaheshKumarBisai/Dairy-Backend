@@ -19,7 +19,13 @@ COPY . .
 RUN npm run build
 
 # Remove development dependencies to keep production light
-RUN npm prune --production
+RUN npm prune --production && \
+    find node_modules/onnxruntime-node/bin -name "*cuda*" -delete && \
+    find node_modules/onnxruntime-node/bin -name "*tensorrt*" -delete && \
+    find node_modules/onnxruntime-node/bin -name "*rocm*" -delete && \
+    find node_modules/onnxruntime-node/bin -name "*darwin*" -exec rm -rf {} + 2>/dev/null || true && \
+    find node_modules/onnxruntime-node/bin -name "*win32*" -exec rm -rf {} + 2>/dev/null || true && \
+    rm -rf /root/.cache /root/.npm
 
 # Stage 2: Production Runner
 FROM node:20-bookworm-slim AS runner
