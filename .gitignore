@@ -50,3 +50,4 @@ tmp/
 # Separate Repositories (Managed in their own independent git repos)
 /admin/
 /front-end-dairy/
+aws-lambda-image-processor/function.zip

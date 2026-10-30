@@ -1,0 +1,15 @@
+node_modules
+dist
+.git
+.github
+.env
+.env.*
+*.log
+npm-debug.log*
+admin
+front-end-dairy
+docs
+coverage
+.temp
+tmp
+
