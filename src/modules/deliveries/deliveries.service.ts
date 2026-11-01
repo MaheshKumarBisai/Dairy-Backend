@@ -205,7 +205,10 @@ export class DeliveriesService {
         };
       })
       .filter((item) => {
+        // Only enforce distance filtering if query explicitly provided live GPS coordinates
         if (
+          query.latitude !== undefined &&
+          query.longitude !== undefined &&
           item.delivery.distanceInMeters !== null &&
           radius !== undefined &&
           radius > 0

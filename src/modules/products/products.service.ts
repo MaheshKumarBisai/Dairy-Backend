@@ -381,7 +381,16 @@ export class ProductsService {
    */
   private resolveImageUrl(url: string | null | undefined, productId: string): string {
     if (!url) return `https://cdn.example.com/products/${productId}.webp`;
-    const storageBase = (process.env.STORAGE_BASE_URL || 'http://localhost:4000/uploads').replace(/\/+$/, '');
+    // If it's already a full Amazon S3 or HTTP(S) URL, preserve it directly!
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      if (url.includes('amazonaws.com') || url.includes('.s3.') || url.includes('prod-dairy-images')) {
+        return url;
+      }
+    }
+    const bucket = process.env.AWS_S3_BUCKET_NAME || 'prod-dairy-images-09876';
+    const region = process.env.AWS_REGION || 'us-east-2';
+    const defaultStorageBase = `https://${bucket}.s3.${region}.amazonaws.com/uploads`;
+    const storageBase = (process.env.STORAGE_BASE_URL || defaultStorageBase).replace(/\/+$/, '');
     const uploadsMatch = url.match(/\/uploads\/(.+)$/);
     if (uploadsMatch) {
       return `${storageBase}/${uploadsMatch[1]}`;
