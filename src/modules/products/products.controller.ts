@@ -55,6 +55,29 @@ export class ProductsController {
     };
   }
 
+  @Public()
+  @Post('public-upload-image')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Public upload endpoint for Admin Portal: removes background & composites onto pure white' })
+  async publicUploadImage(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('merchantId') merchantId?: string,
+  ) {
+    if (!file) {
+      return { success: false, error: 'No file uploaded' };
+    }
+    const mId = merchantId || 'MR-100001';
+    const data = await this.imageService.processAndStoreImage(mId, file.originalname, file.buffer);
+    return {
+      success: true,
+      data: {
+        imageUrl: data.imageUrl,
+        imageId: data.imageId,
+      },
+      __message: 'Product image background removed and placed on clean white background successfully',
+    };
+  }
+
   @ApiBearerAuth()
   @UseGuards(RolesGuard, TenantGuard)
   @Roles(UserRole.MERCHANT)
@@ -130,16 +153,16 @@ export class ProductsController {
     );
     return {
       data,
-      __message: 'Product image processed successfully',
+      __message: 'Product image processed and stored successfully',
     };
   }
 
   @ApiBearerAuth()
   @UseGuards(RolesGuard, TenantGuard)
   @Roles(UserRole.MERCHANT)
-  @Get('merchant/inventory')
-  @ApiOperation({ summary: 'Merchant lists their own catalog with inventory stocks' })
-  @ApiResponse({ status: 200, description: 'Merchant inventory retrieved' })
+  @Get('merchant/list')
+  @ApiOperation({ summary: 'Merchant lists their own catalog with full inventory details' })
+  @ApiResponse({ status: 200, description: 'Merchant products retrieved' })
   async listForMerchant(
     @CurrentUser('merchantId') merchantId: string,
     @Query() query: ProductQueryDto,
@@ -147,7 +170,7 @@ export class ProductsController {
     const data = await this.productsService.listForMerchant(merchantId, query);
     return {
       data,
-      __message: 'Merchant inventory retrieved successfully',
+      __message: 'Merchant products retrieved successfully',
     };
   }
 
@@ -155,20 +178,15 @@ export class ProductsController {
   @UseGuards(RolesGuard, TenantGuard)
   @Roles(UserRole.MERCHANT)
   @Patch(':productId')
-  @ApiOperation({ summary: 'Merchant updates a product in their store' })
+  @ApiOperation({ summary: 'Merchant updates their own product' })
   @ApiResponse({ status: 200, description: 'Product updated successfully' })
   async updateForMerchant(
     @CurrentUser('merchantId') merchantId: string,
-    @CurrentUser('userId') actorId: string,
+    @CurrentUser('userId') userId: string,
     @Param('productId') productId: string,
     @Body() dto: UpdateProductDto,
   ) {
-    const data = await this.productsService.updateForMerchant(
-      merchantId,
-      productId,
-      dto,
-      actorId,
-    );
+    const data = await this.productsService.updateForMerchant(merchantId, productId, dto, userId);
     return {
       data,
       __message: 'Product updated successfully',
@@ -179,8 +197,8 @@ export class ProductsController {
   @UseGuards(RolesGuard, TenantGuard)
   @Roles(UserRole.MERCHANT)
   @Delete(':productId')
-  @ApiOperation({ summary: 'Merchant deactivates a product from their store' })
-  @ApiResponse({ status: 200, description: 'Product deactivated successfully' })
+  @ApiOperation({ summary: 'Merchant deletes (soft-deletes) product' })
+  @ApiResponse({ status: 200, description: 'Product deleted successfully' })
   async deleteForMerchant(
     @CurrentUser('merchantId') merchantId: string,
     @Param('productId') productId: string,
@@ -188,7 +206,7 @@ export class ProductsController {
     const data = await this.productsService.deleteForMerchant(merchantId, productId);
     return {
       data,
-      __message: 'Product deactivated successfully',
+      __message: 'Product deleted successfully',
     };
   }
 }
