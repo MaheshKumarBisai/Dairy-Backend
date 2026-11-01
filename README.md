@@ -299,3 +299,97 @@ curl -I http://dairy-lb-2052637137.us-east-2.elb.amazonaws.com/
 | **`export: get-login-password: bad variable name` in SSM Run Command** | Line breaks were mangled when passing multi-line bash scripts through AWS SSM JSON parameters. | Base64-encode the deployment script (`base64 -w 0 < script.sh`) and execute with `echo "$B64" \| base64 -d \| bash`. |
 | **`EACCES: permission denied, mkdir '/app/uploads'` inside Docker container** | The container process runs as a non-root user without permissions to write to `/app/uploads`. | In `Dockerfile`, add `RUN mkdir -p /app/uploads && chown -R expressjs:nodejs /app/uploads`. |
 | **`PrismaClientInitializationError: Unable to require('libquery_engine-linux-musl.so.node')`** | Alpine Linux (`node:alpine`) lacks required OpenSSL dynamic libraries for Prisma query engine. | Switch Dockerfile base image to **`node:20-bookworm-slim`** (Debian glibc) with `openssl` installed. |
+
+---
+
+## 📱 Mobile Applications & Preview APK Build Guide
+
+The platform includes two cross-platform mobile apps built with **Expo (React Native)** and **Expo Router**:
+- **Customer Mobile App:** `front-end-dairy/customer` (Port `5173`)
+- **Delivery Partner Mobile App:** `front-end-dairy/delivery` (Port `5174`)
+
+---
+
+### 1. Running the Mobile Apps Locally / Web Preview
+
+Both mobile apps are configured to connect to your live AWS cloud backend via your Application Load Balancer:
+```env
+EXPO_PUBLIC_API_URL=http://dairy-lb-2052637137.us-east-2.elb.amazonaws.com/api/v1
+```
+
+#### Run Customer App:
+```bash
+cd front-end-dairy/customer
+npm install
+npx expo start -c
+```
+- Press `w` to view immediately in your web browser.
+- Or scan the terminal QR code using the **Expo Go** mobile app on your Android or iPhone.
+
+#### Run Delivery Partner App:
+```bash
+cd front-end-dairy/delivery
+npm install
+npx expo start -c
+```
+- Press `w` to view immediately in your web browser.
+- Or scan the terminal QR code using **Expo Go**.
+
+---
+
+### 2. How to Build Standalone Preview APKs (`.apk` for Android)
+
+Both mobile apps include pre-configured `eas.json` build profiles set to output direct, installable Android APKs (`buildType: "apk"`).
+
+#### Option A: Cloud Build via EAS CLI (Recommended — No Android Studio or heavy tools needed)
+
+1. **Install EAS CLI globally:**
+   ```bash
+   npm install -g eas-cli
+   ```
+
+2. **Log into your Expo account:**
+   ```bash
+   eas login
+   ```
+   *(Sign up for a free account at [expo.dev](https://expo.dev) if you don't have one).*
+
+3. **Build Customer App APK:**
+   ```bash
+   cd front-end-dairy/customer
+   eas build --platform android --profile preview
+   ```
+   - When prompted to generate a new Android Keystore, select **Yes (Let EAS generate it)**.
+   - EAS will compile the app in the cloud and output a direct download link (and QR code) for `dairy-customer-preview.apk`.
+
+4. **Build Delivery Partner App APK:**
+   ```bash
+   cd front-end-dairy/delivery
+   eas build --platform android --profile preview
+   ```
+   - Once completed, download and install the APK on any Android phone to test live real-time order notifications and map tracking!
+
+---
+
+#### Option B: Local Android APK Build (Requires Android Studio & JDK 17 installed)
+
+If you have Android Studio and the Android SDK installed locally on your computer:
+
+1. **Generate the native Android build files:**
+   ```bash
+   cd front-end-dairy/customer
+   npx expo prebuild --platform android
+   ```
+
+2. **Compile the standalone APK using Gradle:**
+   ```bash
+   cd android
+   ./gradlew assembleRelease
+   ```
+
+3. **Locate your output APK:**
+   ```text
+   front-end-dairy/customer/android/app/build/outputs/apk/release/app-release.apk
+   ```
+   Copy this `.apk` to your phone or emulator to install directly!
+
