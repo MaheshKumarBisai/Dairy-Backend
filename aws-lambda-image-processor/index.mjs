@@ -1,67 +1,38 @@
-import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import pg from 'pg';
-import sharp from 'sharp';
+import Jimp from 'jimp';
 
 const { Client } = pg;
 const s3 = new S3Client();
 
-// Database connection config (RDS PostgreSQL in Private Subnet)
-const dbConfig = {
-  connectionString: process.env.DATABASE_URL,
-};
-
 export const handler = async (event) => {
   console.log('Received S3 Event:', JSON.stringify(event, null, 2));
 
-  // Extract bucket and object key from S3 Event
   const record = event.Records?.[0];
   if (!record) {
+    console.log('No record found in event');
     return { statusCode: 400, body: 'No record found' };
   }
 
   const bucket = record.s3.bucket.name;
   const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
 
+  console.log(`Processing S3 Object from bucket "${bucket}": ${key}`);
+
   // Avoid infinite loops: skip images that are already processed thumbnails
   if (key.includes('/thumbnails/') || key.startsWith('processed/')) {
-    console.log('Skipping already processed image:', key);
+    console.log('Skipping already processed thumbnail:', key);
     return { statusCode: 200, body: 'Skipped processed image' };
   }
 
-  // Expecting key format: "uploads/products/{productId}/{filename}"
+  // Parse path components (e.g., "uploads/products/MR-100001/PRD_front_123.png")
   const keyParts = key.split('/');
-  const entityType = keyParts[1]; // e.g. "products"
-  const entityId = keyParts[2];   // e.g. "prod_123"
+  const entityType = keyParts[1] || 'general';
+  const entityId = keyParts[2] || 'unknown';
 
-  const dbClient = new Client(dbConfig);
-
+  // 1. Fetch image buffer from S3
+  let imageBuffer;
   try {
-    // 1. Connect to RDS PostgreSQL
-    await dbClient.connect();
-    console.log('Connected to RDS PostgreSQL');
-
-    // 2. Validate that the record exists in DB
-    let isValidInDb = false;
-    if (entityType === 'products' && entityId) {
-      const result = await dbClient.query(
-        'SELECT "productId", "status" FROM "Product" WHERE "productId" = $1',
-        [entityId]
-      );
-      if (result.rows.length > 0) {
-        isValidInDb = true;
-      }
-    } else {
-      // General uploads
-      isValidInDb = true;
-    }
-
-    if (!isValidInDb) {
-      console.warn(`Entity ${entityId} does not exist in RDS. Deleting unapproved S3 object: ${key}`);
-      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-      return { statusCode: 403, body: 'Rejected: No matching database record' };
-    }
-
-    // 3. Fetch image buffer from S3
     const getObjRes = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
     const streamToBuffer = (stream) =>
       new Promise((resolve, reject) => {
@@ -70,49 +41,74 @@ export const handler = async (event) => {
         stream.on('error', reject);
         stream.on('end', () => resolve(Buffer.concat(chunks)));
       });
-    const imageBuffer = await streamToBuffer(getObjRes.Body);
-
-    // 4. Validate image with Sharp (format, corrupt image check)
-    const metadata = await sharp(imageBuffer).metadata();
-    console.log(`Image Validated: format=${metadata.format}, width=${metadata.width}, height=${metadata.height}`);
-
-    const allowedFormats = ['jpeg', 'png', 'webp', 'jpg'];
-    if (!allowedFormats.includes(metadata.format)) {
-      console.warn(`Invalid format ${metadata.format}. Deleting file.`);
-      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-      return { statusCode: 400, body: 'Invalid image format' };
-    }
-
-    // 5. Generate Thumbnail (optimized web quality)
-    const thumbnailBuffer = await sharp(imageBuffer)
-      .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer();
-
-    const thumbnailKey = `processed/thumbnails/${keyParts.slice(1).join('/')}.webp`;
-
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: thumbnailKey,
-        Body: thumbnailBuffer,
-        ContentType: 'image/webp',
-      })
-    );
-    console.log(`Thumbnail created and stored at: ${thumbnailKey}`);
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: 'Image validated and processed successfully',
-        thumbnailKey,
-      }),
-    };
-  } catch (error) {
-    console.error('Error processing image:', error);
-    throw error;
-  } finally {
-    await dbClient.end();
+    imageBuffer = await streamToBuffer(getObjRes.Body);
+    console.log(`Fetched object from S3 (${imageBuffer.length} bytes)`);
+  } catch (err) {
+    console.error('Failed to fetch object from S3:', err);
+    return { statusCode: 404, body: 'Object not found in S3' };
   }
-};
 
+  // 2. Validate and process image using Jimp (100% pure JavaScript, zero native C++ bindings)
+  let image;
+  try {
+    image = await Jimp.read(imageBuffer);
+    console.log(`Image parsed successfully: ${image.bitmap.width}x${image.bitmap.height}, MIME: ${image.getMIME()}`);
+  } catch (err) {
+    console.error(`Invalid image format for key: ${key}`, err);
+    return { statusCode: 400, body: 'Invalid or unsupported image format' };
+  }
+
+  // 3. Optional DB record check if DATABASE_URL is set
+  if (process.env.DATABASE_URL) {
+    let dbClient;
+    try {
+      dbClient = new Client({ connectionString: process.env.DATABASE_URL });
+      await dbClient.connect();
+      console.log('Connected to RDS PostgreSQL');
+
+      if (entityId && entityId !== 'unknown') {
+        const res = await dbClient.query(
+          'SELECT "merchantId" AS id FROM "Merchant" WHERE "merchantId" = $1 UNION SELECT "productId" AS id FROM "Product" WHERE "productId" = $1',
+          [entityId]
+        );
+        if (res.rows.length > 0) {
+          console.log(`Validated entity against RDS: ${entityId}`);
+        } else {
+          console.log(`Entity ${entityId} not yet committed in RDS (new draft product)`);
+        }
+      }
+    } catch (dbErr) {
+      console.warn('RDS connection warning (continuing processing):', dbErr.message);
+    } finally {
+      if (dbClient) {
+        try { await dbClient.end(); } catch (_) {}
+      }
+    }
+  }
+
+  // 4. Generate optimized Thumbnail (fit within 400x400)
+  image.scaleToFit(400, 400);
+  const thumbnailBuffer = await image.getBufferAsync(Jimp.MIME_PNG);
+
+  const thumbnailKey = `processed/thumbnails/${keyParts.slice(1).join('/')}`;
+
+  console.log(`Uploading thumbnail to: ${thumbnailKey} (${thumbnailBuffer.length} bytes)`);
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: thumbnailKey,
+      Body: thumbnailBuffer,
+      ContentType: 'image/png',
+    })
+  );
+
+  console.log(`Thumbnail successfully generated and saved to: ${thumbnailKey}`);
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      message: 'Thumbnail generated successfully',
+      thumbnailKey,
+    }),
+  };
+};

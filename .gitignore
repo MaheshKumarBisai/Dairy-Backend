@@ -51,3 +51,4 @@ tmp/
 /admin/
 /front-end-dairy/
 aws-lambda-image-processor/function.zip
+aws-lambda-image-processor/node_modules/

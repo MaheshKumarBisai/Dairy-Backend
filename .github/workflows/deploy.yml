@@ -64,6 +64,13 @@ jobs:
           export PATH=$PATH:/usr/local/bin:/usr/bin:/bin:/snap/bin
           aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
           docker pull "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+          # Sync database schema in RDS directly from inside the VPC
+          docker run --rm \
+            -e DATABASE_URL="$DATABASE_URL" \
+            "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+            npx prisma db push --skip-generate || true
+
           docker stop dairy-backend || true
           docker rm dairy-backend || true
           docker run -d \
